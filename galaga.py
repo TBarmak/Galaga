@@ -4,61 +4,96 @@ Taylor Barmak
 This program allows the user to play Galaga using the arrow keys and space bar.
 
 Recent updates:
-- Game main loop
-- Sizing relative to the screen
-- Created class for the player
+- Player movement
+- Can be imported as a module
+- Lives indicator
 
 Next fixes:
-- Player movement
 - Enemy ships
 
 """
 import pygame
 
+# Global Variables
+HEIGHT = 0
+WIDTH = 0
+
 class PlayerShip:
-    def __init__(self, coordinates):
+    def __init__(self):
         self.lives = 3
-        self.position = coordinates
+        self.position = [(WIDTH/2, HEIGHT*0.85), (WIDTH*0.47, HEIGHT*0.9), (WIDTH*0.53, HEIGHT*0.9)]
+        self.speed = 0
 
-pygame.init()
+    def move_speed(self):
+        for i in range(len(self.position)):
+            self.position[i] = (self.position[i][0] + self.speed, self.position[i][1])
 
-# Get screen dimensions
-infoObject = pygame.display.Info()
+    def set_speed(self, speed):
+        self.speed = speed
 
-# Constant to size the window
-HEIGHT_MULTIPLIER = 0.6
-H_TO_W_MULTIPLIER = 0.8
-height = infoObject.current_h * HEIGHT_MULTIPLIER
-print("Height: " + str(height))
-width = height * H_TO_W_MULTIPLIER
-print("Width: " + str(width))
-size = (int(width), int(height))
-screen = pygame.display.set_mode(size) # , pygame.RESIZABLE)
-pygame.display.set_caption("Galaga")
+def set_dimensions():
+    """
+    Sets the global HEIGHT and WIDTH constants which are the height and width of the window of the game.
+    They are scaled relative to the screen size.
+    :return: None
+    """
+    global HEIGHT
+    global WIDTH
+    # Get screen dimensions
+    infoObject = pygame.display.Info()
 
-clock = pygame.time.Clock()
+    # Constant to size the window
+    HEIGHT_MULTIPLIER = 0.6
+    H_TO_W_MULTIPLIER = 0.8
+    HEIGHT = infoObject.current_h * HEIGHT_MULTIPLIER
+    WIDTH = HEIGHT * H_TO_W_MULTIPLIER
 
-"""
-Code start screen here
-"""
+def draw_heart(surface, color, pos, width):
+    pygame.draw.circle(surface, color, (int(pos[0] + width/4), int(pos[1] + width/4)), int(width/4))
+    pygame.draw.circle(surface, color, (int(pos[0] + 3 * width/4), int(pos[1] + width/4)), int(width/4))
+    pygame.draw.polygon(surface, color, [(pos[0], pos[1] + width/4), (pos[0] + width/2, pos[1] + width), (pos[0] + width, pos[1] + width/4)])
 
-# Create the player
-player = PlayerShip([(width/2, height*0.9), (width*0.47, height*0.95), (width*0.53, height*0.95)])
+def show_lives():
+    for i in range(player.lives):
+        draw_heart(screen, (255, 0, 0), (0.05 * WIDTH + (30 * i), .95 * HEIGHT), 20)
 
-gameOn = True
-while gameOn:
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            gameOn = False
 
-    screen.fill((0, 200, 255))
+if __name__ == '__main__':
+    pygame.init()
 
-    pygame.draw.polygon(screen, (255, 255, 255), player.position)
+    set_dimensions()
+    size = (int(WIDTH), int(HEIGHT))
+    screen = pygame.display.set_mode(size) # , pygame.RESIZABLE)
+    pygame.display.set_caption("Galaga")
 
-    pygame.display.update()
+    clock = pygame.time.Clock()
 
-    clock.tick(60)
+    """
+    Code start screen here
+    """
 
-pygame.quit()
+    # Create the player
+    player = PlayerShip()
+
+    gameOn = True
+    while gameOn:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                gameOn = False
+            if event.type == pygame.KEYUP and 1 not in pygame.key.get_pressed():
+                player.set_speed(0)
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_LEFT:
+                    player.set_speed(-5)
+                if event.key == pygame.K_RIGHT:
+                    player.set_speed(5)
+
+        player.move_speed()
+        screen.fill((0, 200, 255))
+        pygame.draw.polygon(screen, (255, 255, 255), player.position)
+        show_lives()
+        pygame.display.update()
+        clock.tick(60)
+    pygame.quit()
 
 
