@@ -4,13 +4,17 @@ Taylor Barmak
 This program allows the user to play Galaga using the arrow keys and space bar.
 
 Recent updates:
-- Player can't move off screen
-- Starry background
+- Player can shoot missiles (Only keeps track of missiles in the screen)
+- Display enemy ships
+- Enemy ships change direction
+- Can shoot the enemies out of the sky
 
 Next fixes:
-- Enemy ships
-- Player can't move off screen
-
+- Enemy ships drop from the sky and attack the player
+- Check for collisions between enemy ship and player
+- Start screen
+- More levels
+- Do a dance after eliminating all the enemies
 """
 # Imports
 import pygame
@@ -20,6 +24,8 @@ import random
 HEIGHT = 0  # Height of window
 WIDTH = 0   # Width of window
 star_locations = []    # List of coordinates and sizes for the stars
+enemy_ships = []  # List of enemy ship objects
+moves = 75 # Variable to keep track of if its time for the ships to change direction
 
 class PlayerShip:
     """
@@ -37,6 +43,15 @@ class PlayerShip:
         self.lives = 3
         self.position = [(WIDTH*0.5, HEIGHT*0.85), (WIDTH*0.47, HEIGHT*0.9), (WIDTH*0.53, HEIGHT*0.9)]
         self.speed = 0
+        self.missiles = []
+
+    def draw_player(self, surface):
+        """
+        Draws the player on the screen
+        :param surface: the surface onto which the player will be drawn
+        :return: None
+        """
+        pygame.draw.polygon(surface, (255, 255, 255), player.position)
 
     def move_speed(self):
         """
@@ -65,6 +80,118 @@ class PlayerShip:
         # If it's too far right, move it to the farthest right allowed
         elif self.position[0][0] > WIDTH*0.9:
             self.position = [(WIDTH * 0.9, HEIGHT * 0.85), (WIDTH * 0.87, HEIGHT * 0.9), (WIDTH * 0.93, HEIGHT * 0.9)]
+
+    def shoot(self):
+        """
+        Method shoots a missile by appending a missile's coordinates to the list of missiles
+        :return: None
+        """
+        self.missiles.append(self.position[0])
+
+    def get_missiles(self):
+        """
+        Returns the list of missile coordinates
+        :return: a list of missile coordinates
+        """
+        return self.missiles
+
+    def move_missiles(self):
+        """
+        Method moves the missiles up the screen
+        :return: None
+        """
+        for i in range(len(self.missiles)):
+            self.missiles[i] = (self.missiles[i][0], self.missiles[i][1] - 7)
+
+    def remove_missiles(self):
+        """
+        Method removes missiles from the list of missiles if they have left the screen.
+        :return: None
+        """
+        for missile in self.missiles:
+            if missile[1] < 0:
+                self.missiles.remove(missile)
+
+    def explode_missile(self, missile):
+        """
+        Method used to remove a missile when it hits a ship
+        :param missile: a tuple representing the coordinates of the missile to be removed
+        :return: None
+        """
+        self.missiles.remove(missile)
+
+    def draw_missiles(self, surface):
+        """
+        Method draws the missiles on the screen
+        :param surface: the surface to draw the missiles on
+        :return: None
+        """
+        for missile in self.missiles:
+            pygame.draw.rect(surface, (0, 255, 0), pygame.Rect(missile[0], missile[1], 2, 8))
+
+    def show_lives(self, surface):
+        """
+        Show the number of lives a player has at the bottom left corner
+        :return: None
+        """
+        # Draw a heart for each life
+        for i in range(self.lives):
+            draw_heart(surface, (255, 0, 0), (0.05 * WIDTH + (30 * i), .95 * HEIGHT), 20)
+
+class enemyShip:
+    """
+    Class to represent an enemy ship
+    Instance variables:
+    position - a tuple with the x and y coordinates of the ship
+    xspeed - the horizontal velocity of the ship
+    yspeed - the vertical velocity of the ship
+    """
+    def __init__(self, position):
+        """
+        One argument constructor for the enemy ship class
+        Initializes the position to the argument provided, xspeed to 2, yspeed to 0, and width to 5
+        :param position: a tuple representing the x and y coordinates of the ship
+        """
+        self.position = position
+        self.xspeed = 0.2
+        self.yspeed = 0
+        self.width = 20
+
+    def draw_ship(self, surface):
+        """
+        Method draws the enemy ship as a square onto the surface provided
+        :param surface: the surface to draw the ship onto
+        :return: None
+        """
+        pygame.draw.rect(surface, (255, 153, 51), pygame.Rect(self.position[0], self.position[1], self.width, self.width))
+
+    def change_direction(self):
+        """
+        Method reverses the horizontal speed of the enemy ship
+        :return: None
+        """
+        self.xspeed = -1 * self.xspeed
+
+    def move_speed(self):
+        """
+        Method moves enemy ships postion based on its xspeed and yspeed
+        :return: None
+        """
+        self.position = (self.position[0] + self.xspeed, self.position[1] + self.yspeed)
+
+    def get_position(self):
+        """
+        Method returns the position of the ship
+        :return: a tuple representing the position of the ship
+        """
+        return self.position
+
+    def get_width(self):
+        """
+        Method returns the width of the ship
+        :return: an int representing the width of the ship
+        """
+        return self.width
 
 def set_dimensions():
     """
@@ -98,15 +225,6 @@ def draw_heart(surface, color, pos, width):
     pygame.draw.polygon(surface, color, [(pos[0], pos[1] + width/4), (pos[0] + width/2, pos[1] + width),
                                          (pos[0] + width, pos[1] + width/4)])
 
-def show_lives():
-    """
-    Show the number of lives a player has at the bottom left corner
-    :return: None
-    """
-    # Draw a heart for each life
-    for i in range(player.lives):
-        draw_heart(screen, (255, 0, 0), (0.05 * WIDTH + (30 * i), .95 * HEIGHT), 20)
-
 def generate_stars(number):
     """
     Creates locations and radii randomly for stars
@@ -129,7 +247,57 @@ def draw_stars(surface):
     for star in star_locations:
         pygame.draw.circle(surface, (255, 255, 255), star[:2], star[2])
 
+def generate_enemies(rows):
+    """
+    Method generates enemy ships and appends them to the global variable enemy_ships
+    :param rows: a list or tuple where each entry specifies the number of ships in that row
+    :return: None
+    """
+    global enemy_ships
+    for row_index in range(len(rows)):
+        for i in range(rows[row_index]):
+            ship = enemyShip(((1 + i) * WIDTH/(1 + rows[row_index]), 30*(1 + row_index)))
+            enemy_ships.append(ship)
 
+def draw_enemies(surface):
+    """
+    Method draws the enemy ships in the global enemy ships list onto the surface provided
+    :param surface: the surface to draw the ships onto
+    :return: None
+    """
+    for ship in enemy_ships:
+        ship.draw_ship(surface)
+
+def move_enemies():
+    """
+    Method moves the enemy ships in the global enemy ships list according to their speed
+    :return: None
+    """
+    global moves
+    moves += 1
+    for ship in enemy_ships:
+        if moves > 150:
+            ship.change_direction()
+        ship.move_speed()
+    if moves > 150:
+        moves = 0
+
+def check_missile_collisions(player):
+    """
+    Method checks if a missile has collided with an enemy and removes the missile and enemy if there is a collision
+    :param player: the player shooting the missiles (a playerShip object)
+    :return: None
+    """
+    global enemy_ships
+    if len(enemy_ships) > 0:
+        width = enemy_ships[0].get_width()
+    for missile in player.get_missiles():
+        for enemy in enemy_ships:
+            ePos = enemy.get_position()
+            if ePos[0] < missile[0] < ePos[0] + width and ePos[1] < missile[1] < ePos[1] + width:
+                print("Contact!")
+                enemy_ships.remove(enemy)
+                player.explode_missile(missile)
 
 if __name__ == '__main__':
     pygame.init()
@@ -150,26 +318,52 @@ if __name__ == '__main__':
 
     # Generate the stars for the background
     generate_stars(300)
+    generate_enemies([9, 5, 6, 7])
 
     gameOn = True
     while gameOn:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 gameOn = False
+            # If a key is released and there are no other keys pressed, set speed to 0
             if event.type == pygame.KEYUP and 1 not in pygame.key.get_pressed():
                 player.set_speed(0)
+            # If a key is pressed, respond accordingly
             if event.type == pygame.KEYDOWN:
+                # Move left if the left key is pressed
                 if event.key == pygame.K_LEFT:
                     player.set_speed(-5)
+                # Move right if the right key is pressed
                 if event.key == pygame.K_RIGHT:
                     player.set_speed(5)
+                # Shoot missiles if the space bar is pressed
+                if event.key == pygame.K_SPACE:
+                    player.shoot()
 
+        # Move the coordinates of the player and missiles
         player.move_speed()
+        player.move_missiles()
+        player.remove_missiles()
+        # Keep the player in the viewable frame
         player.keep_in_bounds()
+
+        # Move the enemy ships
+        move_enemies()
+
+        check_missile_collisions(player)
+
+        # Cover everything up with the background and draw the stars
         screen.fill((0, 0, 100))
         draw_stars(screen)
-        pygame.draw.polygon(screen, (255, 255, 255), player.position)
-        show_lives()
+
+        # Draw the player, missiles, and show the lives
+        player.draw_player(screen)
+        player.draw_missiles(screen)
+        player.show_lives(screen)
+
+        # Draw the enemy ships
+        draw_enemies(screen)
+
         pygame.display.update()
         clock.tick(60)
     pygame.quit()
