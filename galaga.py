@@ -4,25 +4,26 @@ Taylor Barmak
 This program allows the user to play Galaga using the arrow keys and space bar.
 
 Recent updates:
-- Enemy ships have a value
-- Keeps score and displays it in the bottom right
-- Start screen
+- Enemies drop from the sky at a controllable rate
+- Check for collisions between enemy ship and player
+- Enemy ships pursue the player as they fall
 
 Next fixes:
-- Enemy ships drop from the sky and attack the player
-- Check for collisions between enemy ship and player
+- Enemy ships that miss go back to where they started
 - More levels
 - Do a dance after eliminating all the enemies
 """
 # Imports
 import pygame
 import random
+import math
 
 # Global Variables
 HEIGHT = 0  # Height of window
 WIDTH = 0   # Width of window
 star_locations = []    # List of coordinates and sizes for the stars
 enemy_ships = []  # List of enemy ship objects
+dropping_ships = []    # List of enemy ships that are falling
 moves = 75  # Variable to keep track of if it's time for the ships to change direction
 score = 0   # Variable to keep track of the player's score
 
@@ -43,6 +44,13 @@ class PlayerShip:
         self.position = [(WIDTH*0.5, HEIGHT*0.85), (WIDTH*0.47, HEIGHT*0.9), (WIDTH*0.53, HEIGHT*0.9)]
         self.speed = 0
         self.missiles = []
+
+    def get_position(self):
+        """
+        Method returns a list of the coordinates that make up the ship
+        :return: a list of tuples containing the coordinates of each vertex of the ship
+        """
+        return self.position
 
     def draw_player(self, surface):
         """
@@ -137,6 +145,9 @@ class PlayerShip:
         for i in range(self.lives):
             draw_heart(surface, (255, 0, 0), (0.05 * WIDTH + (30 * i), .95 * HEIGHT), 20)
 
+    def dec_lives(self):
+        self.lives -= 1
+
 class enemyShip:
     """
     Class to represent an enemy ship
@@ -199,6 +210,30 @@ class enemyShip:
         :return: an int representing the value of the ship
         """
         return self.value
+
+    def drop(self):
+        """
+        Method makes an enemy start dropping towards the player
+        :return: None
+        """
+        self.yspeed = 2
+
+    def pursue(self, player):
+        """
+        Method causes the ship to adjust its velocity to pursue the player
+        :param player: the playerShip to pursue
+        :return: None
+        """
+        pPos = player.get_position()[0]
+        ePos = self.position
+        slope = (pPos[1] - ePos[1]) / (pPos[0] - ePos[0])
+        x_speed = 2 / slope
+        if x_speed > 2:
+            x_speed = 2
+        elif x_speed < -2:
+            x_speed = -2
+        self.xspeed = x_speed
+
 
 def set_dimensions():
     """
@@ -275,7 +310,7 @@ def draw_enemies(surface):
     for ship in enemy_ships:
         ship.draw_ship(surface)
 
-def move_enemies():
+def move_enemies(player):
     """
     Method moves the enemy ships in the global enemy ships list according to their speed
     :return: None
@@ -285,6 +320,8 @@ def move_enemies():
     for ship in enemy_ships:
         if moves > 150:
             ship.change_direction()
+        if ship in dropping_ships:
+            ship.pursue(player)
         ship.move_speed()
     if moves > 150:
         moves = 0
@@ -306,6 +343,28 @@ def check_missile_collisions(player):
                 score += enemy.get_value()
                 enemy_ships.remove(enemy)
                 player.explode_missile(missile)
+
+def check_ship_collisions(player):
+    """
+    Method checks if an enemy ship has collided with the player ship
+    :param player: a playerShip object
+    :return: None
+    """
+    global lives
+    for ship in dropping_ships:
+        ePos = ship.get_position()
+        pPos = player.get_position()
+        width = ship.get_width()
+        eCenter = (ePos[0] + (width/2), ePos[1] + (width/2))
+        pCenter = (pPos[0][0], (pPos[0][1] + pPos[1][1])/2)
+        distance = math.sqrt(((eCenter[0] - pCenter[0]) ** 2) + ((eCenter[1] - pCenter[1]) ** 2))
+        if distance < (width/2) + (pPos[1][1] - pPos[0][1])/2:
+            try:
+                enemy_ships.remove(ship)
+                dropping_ships.remove(ship)
+            except:
+                pass
+            player.dec_lives()
 
 def display_score(surface):
     """
@@ -342,6 +401,18 @@ def display_start(surface):
     surface.blit(title, textRectTitle)
     surface.blit(author, textRectAuthor)
     surface.blit(instructions, textRectInstructions)
+
+def drop_enemies(prob):
+    """
+    Method causes enemies to drop out of the sky at a speed relative to the argument provided
+    :param prob: the higher this number the faster the enemies fall
+    :return: None
+    """
+    num = random.random() * 500
+    if num < prob:
+        ship = random.choice(enemy_ships)
+        dropping_ships.append(ship)
+        ship.drop()
 
 if __name__ == '__main__':
     pygame.init()
@@ -396,10 +467,12 @@ if __name__ == '__main__':
             player.keep_in_bounds()
 
             # Move the enemy ships
-            move_enemies()
+            drop_enemies(2)
+            move_enemies(player)
 
             # Check for collisions between the missiles and enemies
             check_missile_collisions(player)
+            check_ship_collisions(player)
 
             # Cover everything up with the background and draw the stars
             screen.fill((0, 0, 100))
