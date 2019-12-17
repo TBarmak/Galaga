@@ -4,14 +4,16 @@ Taylor Barmak
 This program allows the user to play Galaga using the arrow keys and space bar.
 
 Recent updates:
-- Add losing screen
-- Add screen in between levels
-- More levels that get more difficult as you continue
-- Fixed bug where one ship could take away all of your lives
+- Instructions on start screen
+- Levels are more interesting (Change the formation of the ships)
+- Reset enemy ships when player loses a life
+- Player ship explodes when it gets hit
 
 Next fixes:
+- Enemy ships of different values and colors
 - Do a dance after eliminating all the enemies
-- Change color of ship when it gets hit
+- Use pictures instead of shapes for the ships
+- Save high score and have a leader board where you can enter your initials
 """
 # Imports
 import pygame
@@ -43,12 +45,15 @@ class PlayerShip:
         """
         Default constructor for PlayerShip
         Initializes lives to 3, the position to be in the middle of the screen close to the bottom, and the speed to 0
+        The missiles will be the list of coordinates of the missiles that the ship has shot.
+        Explosion will be a counter that keeps track of if an explosion should be shown.
         """
         self.lives = 3
         self.shipHits = [] # List of the ships that have hit the player so that collisions aren't counted twice
         self.position = [(WIDTH*0.5, HEIGHT*0.85), (WIDTH*0.47, HEIGHT*0.9), (WIDTH*0.53, HEIGHT*0.9)]
         self.speed = 0
         self.missiles = []
+        self.explosion = 0
 
     def get_position(self):
         """
@@ -63,7 +68,12 @@ class PlayerShip:
         :param surface: the surface onto which the player will be drawn
         :return: None
         """
-        pygame.draw.polygon(surface, (255, 255, 255), player.position)
+        if self.explosion == 0:
+            pygame.draw.polygon(surface, (255, 255, 255), player.position)
+        else:
+            image = pygame.image.load("explosion.png")
+            surface.blit(image, (self.position[1][0] - 0.07 * WIDTH, self.position[1][1] - 0.09 * HEIGHT))
+            self.explosion -= 1
 
     def move_speed(self):
         """
@@ -87,11 +97,11 @@ class PlayerShip:
         :return: None
         """
         # If it's too far left, move it to the farthest left allowed
-        if self.position[0][0] < WIDTH*0.1:
-            self.position = [(WIDTH*0.1, HEIGHT*0.85), (WIDTH*0.07, HEIGHT*0.9), (WIDTH*0.13, HEIGHT*0.9)]
+        if self.position[0][0] < WIDTH*0.05:
+            self.position = [(WIDTH*0.05, HEIGHT*0.85), (WIDTH*0.02, HEIGHT*0.9), (WIDTH*0.08, HEIGHT*0.9)]
         # If it's too far right, move it to the farthest right allowed
-        elif self.position[0][0] > WIDTH*0.9:
-            self.position = [(WIDTH * 0.9, HEIGHT * 0.85), (WIDTH * 0.87, HEIGHT * 0.9), (WIDTH * 0.93, HEIGHT * 0.9)]
+        elif self.position[0][0] > WIDTH*0.95:
+            self.position = [(WIDTH * 0.95, HEIGHT * 0.85), (WIDTH * 0.92, HEIGHT * 0.9), (WIDTH * 0.98, HEIGHT * 0.9)]
 
     def shoot(self):
         """
@@ -169,6 +179,13 @@ class PlayerShip:
         """
         return self.lives
 
+    def explode(self):
+        """
+        Method sets the explosion counter to a positive number so an explosion is shown instead of the ship
+        :return: None
+        """
+        self.explosion = 50
+
 class enemyShip:
     """
     Class to represent an enemy ship
@@ -222,6 +239,16 @@ class enemyShip:
         :return: None
         """
         self.position = (self.position[0] + self.xspeed, self.position[1] + self.yspeed)
+
+    def set_speed(self, xspeed, yspeed):
+        """
+        Method sets the speed of the enemy ship according to the arguments provided
+        :param xspeed: a float or int representing the horizontal speed of the ship
+        :param yspeed: a float or int representing the vertical speed of the ship
+        :return: None
+        """
+        self.xspeed = xspeed
+        self.yspeed = yspeed
 
     def get_position(self):
         """
@@ -398,12 +425,10 @@ def move_enemies(player):
         if ship in resetting_ships:
             desired_pos = (ship.get_init_pos()[0] + (enemy_ships[0].get_position()[0] - enemy_ships[0].get_init_pos()[0]),
                     ship.get_init_pos()[1] + (enemy_ships[0].get_position()[1] - enemy_ships[0].get_init_pos()[1]))
-            if SWAY_DIRECTION:
-                desired_speed = FLEET_SWAY_SPEED
-            else:
-                desired_speed = -FLEET_SWAY_SPEED
+            desired_speed = (-1 + (2 * SWAY_DIRECTION)) * FLEET_SWAY_SPEED
             ship.reset(desired_pos, desired_speed)
         ship.move_speed()
+    # If it's time to switch the direction of the sway
     if moves > 150:
         SWAY_DIRECTION = not SWAY_DIRECTION
         moves = 0
@@ -428,11 +453,15 @@ def check_missile_collisions(player):
 
 def check_ship_collisions(player):
     """
-    Method checks if an enemy ship has collided with the player ship
+    Method checks if an enemy ship has collided with the player ship. If there is a collision, it will remove the enemy
+    ship, decrement the player's lives, and reset the enemy ships to be back with the rest of the fleet.
     :param player: a playerShip object
     :return: None
     """
     global lives
+    global dropping_ships
+    global resetting_ships
+    global completedLevel
     for ship in dropping_ships:
         ePos = ship.get_position()
         pPos = player.get_position()
@@ -447,6 +476,13 @@ def check_ship_collisions(player):
             except:
                 pass
             player.dec_lives(ship)
+            player.explode()
+            if len(enemy_ships) == 0:
+                completedLevel = True
+            else:
+                start_level()
+            dropping_ships = []
+            resetting_ships = []
 
 def display_score(surface):
     """
@@ -471,17 +507,30 @@ def display_start(surface):
     font1 = pygame.font.Font('freesansbold.ttf', 80)
     font2 = pygame.font.Font('freesansbold.ttf', 30)
     font3 = pygame.font.Font('freesansbold.ttf', 20)
+
     title = font1.render("Galaga", True, (255, 255, 255))
     author = font2.render("Taylor Barmak", True, (255, 255, 255))
+    howTo1 = font3.render("Use the arrow keys to move", True, (255, 255, 255))
+    howTo2 = font3.render("and the space bar to shoot.", True, (255, 255, 255))
     instructions = font3.render("Press [space] to play.", True, (255, 255, 255))
+
     textRectTitle = title.get_rect()
     textRectAuthor = author.get_rect()
+    textRectHowTo1 = howTo1.get_rect()
+    textRectHowTo2 = howTo2.get_rect()
     textRectInstructions = instructions.get_rect()
+
     textRectTitle.center = (WIDTH * 0.5, HEIGHT * 0.5)
     textRectAuthor.center = (WIDTH * 0.5, HEIGHT * 0.6)
-    textRectInstructions.center = (WIDTH*0.5, HEIGHT * 0.8)
+    textRectHowTo1.center = (WIDTH * 0.5, HEIGHT * 0.7)
+    textRectHowTo2.center = (WIDTH * 0.5, HEIGHT * 0.75)
+    textRectInstructions.center = (WIDTH*0.5, HEIGHT * 0.9)
+
+
     surface.blit(title, textRectTitle)
     surface.blit(author, textRectAuthor)
+    surface.blit(howTo1, textRectHowTo1)
+    surface.blit(howTo2, textRectHowTo2)
     surface.blit(instructions, textRectInstructions)
 
 def display_lost(surface):
@@ -535,6 +584,24 @@ def drop_enemies(prob):
             dropping_ships.append(ship)
             ship.drop()
 
+def start_level():
+    """
+    Method will generate a fleet of enemies for the level. The method is also used when a player dies to reset the
+    remaining enemies to their orignial position.
+    :return: None
+    """
+    # If there are remaining enemy ships (player lost a life and ships need to be reset), put the ships back
+    if len(enemy_ships) > 0:
+        for ship in enemy_ships:
+            ship.set_position(ship.get_init_pos())
+            ship.set_speed((-1 + (2 * SWAY_DIRECTION)) * FLEET_SWAY_SPEED, 0)
+    else:
+        nums = []
+        for i in range(5):
+            num = random.randint(10 - i, (10 + 3 * level) - i)
+            nums.append(num)
+        generate_enemies(nums)
+
 if __name__ == '__main__':
     pygame.init()
 
@@ -551,7 +618,7 @@ if __name__ == '__main__':
     # Generate the stars for the background
     generate_stars(300)
 
-    generate_enemies([9, 5, 6, 7])
+    start_level()
 
     atStart = True  # variable to determine if start screen should be shown
     lost = False    # Variable for if player lost the game
@@ -579,7 +646,7 @@ if __name__ == '__main__':
                     if completedLevel:
                         level += 1
                         completedLevel = False
-                        generate_enemies([9, 5, 6, 7])
+                        start_level()
                     else:
                         player.shoot()
 
@@ -598,7 +665,7 @@ if __name__ == '__main__':
             player.keep_in_bounds()
 
             # Move the enemy ships
-            drop_enemies(2 * level)
+            drop_enemies(10 * level)
             move_enemies(player)
 
             # If all ships have been eliminated, show the in between levels screen
