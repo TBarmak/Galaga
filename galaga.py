@@ -4,11 +4,14 @@ Taylor Barmak
 This program allows the user to play Galaga using the arrow keys and space bar.
 
 Recent updates:
-- Enemy ships that miss go back to where they started
+- Add losing screen
+- Add screen in between levels
+- More levels that get more difficult as you continue
+- Fixed bug where one ship could take away all of your lives
 
 Next fixes:
-- More levels
 - Do a dance after eliminating all the enemies
+- Change color of ship when it gets hit
 """
 # Imports
 import pygame
@@ -26,6 +29,7 @@ dropping_ships = []    # List of enemy ships that are falling
 resetting_ships = []    # List of enemy ships that are putting themselves back into their original position
 moves = 75  # Variable to keep track of if it's time for the ships to change direction
 score = 0   # Variable to keep track of the player's score
+level = 1  # Variable to keep track of what level the player is on
 
 class PlayerShip:
     """
@@ -41,6 +45,7 @@ class PlayerShip:
         Initializes lives to 3, the position to be in the middle of the screen close to the bottom, and the speed to 0
         """
         self.lives = 3
+        self.shipHits = [] # List of the ships that have hit the player so that collisions aren't counted twice
         self.position = [(WIDTH*0.5, HEIGHT*0.85), (WIDTH*0.47, HEIGHT*0.9), (WIDTH*0.53, HEIGHT*0.9)]
         self.speed = 0
         self.missiles = []
@@ -148,8 +153,21 @@ class PlayerShip:
         for i in range(self.lives):
             draw_heart(surface, (255, 0, 0), (0.05 * WIDTH + (30 * i), .95 * HEIGHT), 20)
 
-    def dec_lives(self):
-        self.lives -= 1
+    def dec_lives(self, ship):
+        """
+        Method decrements the number of lives by 1
+        :return: None
+        """
+        if ship not in self.shipHits:
+            self.shipHits.append(ship)
+        self.lives = 3 - len(self.shipHits)
+
+    def get_lives(self):
+        """
+        Method returns the number of lives the player has
+        :return: an int representing the number of lives remaining
+        """
+        return self.lives
 
 class enemyShip:
     """
@@ -170,7 +188,7 @@ class enemyShip:
         self.init_position = position
         self.xspeed = FLEET_SWAY_SPEED
         self.yspeed = 0
-        self.width = 20
+        self.width = 15
         self.value = val
 
     def get_init_pos(self):
@@ -428,7 +446,7 @@ def check_ship_collisions(player):
                 dropping_ships.remove(ship)
             except:
                 pass
-            player.dec_lives()
+            player.dec_lives(ship)
 
 def display_score(surface):
     """
@@ -466,6 +484,44 @@ def display_start(surface):
     surface.blit(author, textRectAuthor)
     surface.blit(instructions, textRectInstructions)
 
+def display_lost(surface):
+    """
+    Method displays the screen that appears when the player loses
+    :param surface: the surface to draw the lost screen on
+    :return: None
+    """
+    surface.fill((0, 0, 100))
+    draw_stars(surface)
+    font1 = pygame.font.Font('freesansbold.ttf', 70)
+    font2 = pygame.font.Font('freesansbold.ttf', 80)
+    font3 = pygame.font.Font('freesansbold.ttf', 100)
+    message = font1.render("You lost!", True, (255, 255, 255))
+    scoreMsg = font2.render("Score: " , True, (255, 255, 255))
+    finalScore = font3.render(str(score), True, (255, 255, 255))
+    textRectMessage = message.get_rect()
+    textRectScoreMsg = scoreMsg.get_rect()
+    textRectScore = finalScore.get_rect()
+    textRectMessage.center = (WIDTH * 0.5, HEIGHT * 0.3)
+    textRectScoreMsg.center = (WIDTH * 0.5, HEIGHT * 0.5)
+    textRectScore.center = (WIDTH * 0.5, HEIGHT * 0.75)
+    surface.blit(message, textRectMessage)
+    surface.blit(scoreMsg, textRectScoreMsg)
+    surface.blit(finalScore, textRectScore)
+
+def display_continue(surface):
+    """
+    Method displays the screen that appears in between levels
+    :param surface: the surface to draw the continue screen on
+    :return: None
+    """
+    surface.fill((0, 0, 100))
+    draw_stars(surface)
+    font1 = pygame.font.Font('freesansbold.ttf', 30)
+    message = font1.render("Press [space] to continue", True, (255, 255, 255))
+    textRectMessage = message.get_rect()
+    textRectMessage.center = (WIDTH * 0.5, HEIGHT * 0.5)
+    surface.blit(message, textRectMessage)
+
 def drop_enemies(prob):
     """
     Method causes enemies to drop out of the sky at a speed relative to the argument provided
@@ -497,8 +553,10 @@ if __name__ == '__main__':
 
     generate_enemies([9, 5, 6, 7])
 
-    atStart = True
-    playing = True
+    atStart = True  # variable to determine if start screen should be shown
+    lost = False    # Variable for if player lost the game
+    completedLevel = False  # Variable for if player is in between levels
+    playing = True  # Variable for if the game should continue
     while playing:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -518,11 +576,19 @@ if __name__ == '__main__':
                 if event.key == pygame.K_SPACE:
                     if atStart:
                         atStart = not atStart
+                    if completedLevel:
+                        level += 1
+                        completedLevel = False
+                        generate_enemies([9, 5, 6, 7])
                     else:
                         player.shoot()
 
         if atStart:
             display_start(screen)
+        elif lost:
+            display_lost(screen)
+        elif completedLevel:
+            display_continue(screen)
         else:
             # Move the coordinates of the player and missiles
             player.move_speed()
@@ -532,12 +598,18 @@ if __name__ == '__main__':
             player.keep_in_bounds()
 
             # Move the enemy ships
-            drop_enemies(2)
+            drop_enemies(2 * level)
             move_enemies(player)
+
+            # If all ships have been eliminated, show the in between levels screen
+            if len(enemy_ships) == 0:
+                completedLevel = True
 
             # Check for collisions between the missiles and enemies
             check_missile_collisions(player)
             check_ship_collisions(player)
+            if player.get_lives() < 0:
+                lost = True
 
             # Cover everything up with the background and draw the stars
             screen.fill((0, 0, 100))
@@ -551,6 +623,7 @@ if __name__ == '__main__':
             # Draw the enemy ships
             draw_enemies(screen)
 
+            # Show the score of the game
             display_score(screen)
 
         pygame.display.update()
