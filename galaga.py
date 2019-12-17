@@ -4,12 +4,9 @@ Taylor Barmak
 This program allows the user to play Galaga using the arrow keys and space bar.
 
 Recent updates:
-- Enemies drop from the sky at a controllable rate
-- Check for collisions between enemy ship and player
-- Enemy ships pursue the player as they fall
+- Enemy ships that miss go back to where they started
 
 Next fixes:
-- Enemy ships that miss go back to where they started
 - More levels
 - Do a dance after eliminating all the enemies
 """
@@ -21,9 +18,12 @@ import math
 # Global Variables
 HEIGHT = 0  # Height of window
 WIDTH = 0   # Width of window
+FLEET_SWAY_SPEED = 0.2   # Constant to determine the sway speed of the enemy ships
+SWAY_DIRECTION = True   # bool used to tell if the fleet is swaying left or right
 star_locations = []    # List of coordinates and sizes for the stars
 enemy_ships = []  # List of enemy ship objects
 dropping_ships = []    # List of enemy ships that are falling
+resetting_ships = []    # List of enemy ships that are putting themselves back into their original position
 moves = 75  # Variable to keep track of if it's time for the ships to change direction
 score = 0   # Variable to keep track of the player's score
 
@@ -125,7 +125,10 @@ class PlayerShip:
         :param missile: a tuple representing the coordinates of the missile to be removed
         :return: None
         """
-        self.missiles.remove(missile)
+        try:
+            self.missiles.remove(missile)
+        except:
+            pass
 
     def draw_missiles(self, surface):
         """
@@ -164,10 +167,18 @@ class enemyShip:
         :param val: the value of the ship (how many points are received for destroying it)
         """
         self.position = position
-        self.xspeed = 0.2
+        self.init_position = position
+        self.xspeed = FLEET_SWAY_SPEED
         self.yspeed = 0
         self.width = 20
         self.value = val
+
+    def get_init_pos(self):
+        """
+        Method returns the initial position of the enemy ship
+        :return: a tuple containing the coordinates of the position where the ship started
+        """
+        return self.init_position
 
     def draw_ship(self, surface):
         """
@@ -182,7 +193,10 @@ class enemyShip:
         Method reverses the horizontal speed of the enemy ship
         :return: None
         """
-        self.xspeed = -1 * self.xspeed
+        if SWAY_DIRECTION == True:
+            self.xspeed = FLEET_SWAY_SPEED
+        else:
+            self.xspeed = -FLEET_SWAY_SPEED
 
     def move_speed(self):
         """
@@ -197,6 +211,14 @@ class enemyShip:
         :return: a tuple representing the position of the ship
         """
         return self.position
+
+    def set_position(self, position):
+        """
+        Method sets the position of the ship to the argument provided
+        :param position: a tuple containing the x and y coordinates of the ship
+        :return: None
+        """
+        self.position = position
 
     def get_width(self):
         """
@@ -224,7 +246,7 @@ class enemyShip:
         :param player: the playerShip to pursue
         :return: None
         """
-        pPos = player.get_position()[0]
+        pPos = player.get_position()[1]
         ePos = self.position
         slope = (pPos[1] - ePos[1]) / (pPos[0] - ePos[0])
         x_speed = 2 / slope
@@ -234,6 +256,28 @@ class enemyShip:
             x_speed = -2
         self.xspeed = x_speed
 
+    def reset(self, pos, speed):
+        """
+        Player returns to a desired position provided as the argument
+        :param pos: the position to return to
+        :return: None
+        """
+        if self.position[0] < pos[0]:
+            self.xspeed = 1
+        elif self.position[0] > pos[0]:
+            self.xspeed = -1
+        if self.position[1] < pos[1]:
+            self.yspeed = 1
+        elif self.position[1] > pos[1]:
+            self.yspeed = -1
+        if abs(self.position[0] - pos[0]) < 10:
+            self.position = (pos[0], self.position[1])
+        if abs(self.position[1] - pos[1]) < 10:
+            self.position = (self.position[0], pos[1])
+        if self.position == pos:
+            self.xspeed = speed
+            self.yspeed = 0
+            resetting_ships.remove(self)
 
 def set_dimensions():
     """
@@ -316,14 +360,34 @@ def move_enemies(player):
     :return: None
     """
     global moves
+    global SWAY_DIRECTION
+    # Increment the counter to see if the ships need to sway back
     moves += 1
     for ship in enemy_ships:
-        if moves > 150:
-            ship.change_direction()
+        # Change directions if the time has come
+        ship.change_direction()
+        # Have the dropping ships pursue the player
         if ship in dropping_ships:
+            if ship in resetting_ships:
+                dropping_ships.remove(ship)
             ship.pursue(player)
+            # Reset if they have gone to the bottom of the screen
+            if ship.get_position()[1] > HEIGHT:
+                dropping_ships.remove(ship)
+                ship.set_position((ship.get_position()[0], -ship.get_width()))
+                resetting_ships.append(ship)
+        # Have the dropping ships reset to their original position
+        if ship in resetting_ships:
+            desired_pos = (ship.get_init_pos()[0] + (enemy_ships[0].get_position()[0] - enemy_ships[0].get_init_pos()[0]),
+                    ship.get_init_pos()[1] + (enemy_ships[0].get_position()[1] - enemy_ships[0].get_init_pos()[1]))
+            if SWAY_DIRECTION:
+                desired_speed = FLEET_SWAY_SPEED
+            else:
+                desired_speed = -FLEET_SWAY_SPEED
+            ship.reset(desired_pos, desired_speed)
         ship.move_speed()
     if moves > 150:
+        SWAY_DIRECTION = not SWAY_DIRECTION
         moves = 0
 
 def check_missile_collisions(player):
@@ -358,7 +422,7 @@ def check_ship_collisions(player):
         eCenter = (ePos[0] + (width/2), ePos[1] + (width/2))
         pCenter = (pPos[0][0], (pPos[0][1] + pPos[1][1])/2)
         distance = math.sqrt(((eCenter[0] - pCenter[0]) ** 2) + ((eCenter[1] - pCenter[1]) ** 2))
-        if distance < (width/2) + (pPos[1][1] - pPos[0][1])/2:
+        if distance < (1.5 * width/2) + (pPos[1][1] - pPos[0][1])/2:
             try:
                 enemy_ships.remove(ship)
                 dropping_ships.remove(ship)
@@ -408,11 +472,12 @@ def drop_enemies(prob):
     :param prob: the higher this number the faster the enemies fall
     :return: None
     """
-    num = random.random() * 500
-    if num < prob:
-        ship = random.choice(enemy_ships)
-        dropping_ships.append(ship)
-        ship.drop()
+    if len(enemy_ships) > 0:
+        num = random.random() * 500
+        if num < prob:
+            ship = random.choice(enemy_ships)
+            dropping_ships.append(ship)
+            ship.drop()
 
 if __name__ == '__main__':
     pygame.init()
