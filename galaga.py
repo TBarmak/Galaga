@@ -4,10 +4,9 @@ Taylor Barmak
 This program allows the user to play Galaga using the arrow keys and space bar.
 
 Recent updates:
-- Instructions on start screen
-- Levels are more interesting (Change the formation of the ships)
-- Reset enemy ships when player loses a life
-- Player ship explodes when it gets hit
+- Add leaderboard.txt file
+- Add read_leaderboard method to read in from the leaderboard file
+- Add insert_leaderboard to insert a score into the leaderboard
 
 Next fixes:
 - Enemy ships of different values and colors
@@ -602,6 +601,46 @@ def start_level():
             nums.append(num)
         generate_enemies(nums)
 
+def read_leaderboard(filename):
+    """
+    Method reads in the leaderboard from the filename and returns a list of tuples containing the initials and score of
+    the players in the file.
+    :param filename: the name of the file where the leaderboard is stored
+    :return: a list of tuples containing the initials and scores of the players in the file.
+    """
+    ret = []
+    with open(filename) as f_read:
+        line = f_read.readline().strip().split()
+        ret.append((line[0], int(line[1])))
+    return ret
+
+def insert_leaderboard(score, leaderboard):
+    """
+    Method attempts to enter a score into the leaderboard. Leaderboard will only store top 10 scores. It will return
+    True if it was successfully inserted, false otherwise (not in top 10).
+    :param score: a tuple containing a string of initials as the first element, and an int representing the score as the
+    second element.
+    :param leaderboard: a list of tuples in the same form as the score parameter representing the top 10 scores
+    :return: True if the score was added to the leaderboard, False otherwise
+    """
+    # If the score is lower than the last score on the leaderboard and there are already 10 scores, return false
+    if score[1] < leaderboard[-1][1] and len(leaderboard) == 10:
+        return False
+    else:
+        # Starting from the back of the list, insert the score at the proper position
+        for i in range(len(leaderboard), 1):
+            if score[1] < leaderboard[i - 1][1]:
+                leaderboard.insert(i, score)
+                break
+        # Keep the length of the list down to 10
+        if len(leaderboard) > 10:
+            leaderboard = leaderboard[:10]
+        return True
+
+
+
+
+
 if __name__ == '__main__':
     pygame.init()
 
@@ -665,7 +704,7 @@ if __name__ == '__main__':
             player.keep_in_bounds()
 
             # Move the enemy ships
-            drop_enemies(10 * level)
+            drop_enemies(2 * level)
             move_enemies(player)
 
             # If all ships have been eliminated, show the in between levels screen
