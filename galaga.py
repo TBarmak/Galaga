@@ -4,9 +4,9 @@ Taylor Barmak
 This program allows the user to play Galaga using the arrow keys and space bar.
 
 Recent updates:
-- Add leaderboard.txt file
-- Add read_leaderboard method to read in from the leaderboard file
-- Add insert_leaderboard to insert a score into the leaderboard
+- Fix leaderboard insert method
+- Fix read_leaderboard method
+- Write write_leaderboard method
 
 Next fixes:
 - Enemy ships of different values and colors
@@ -611,8 +611,22 @@ def read_leaderboard(filename):
     ret = []
     with open(filename) as f_read:
         line = f_read.readline().strip().split()
-        ret.append((line[0], int(line[1])))
+        while line:
+            ret.append((line[0], int(line[1])))
+            line = f_read.readline().strip().split()
     return ret
+
+def write_leaderboard(filename, leaderboard):
+    """
+    Method writes a leaderboard to the file provided as the argument
+    :param filename: a string filename to write to
+    :param leaderboard: a list of tuples representing the leaderboard
+    :return: None
+    """
+    f = open("leaderboard.txt", "w")
+    for leader in leaderboard:
+        print(leader[0], leader[1], file=f)
+    f.close()
 
 def insert_leaderboard(score, leaderboard):
     """
@@ -624,22 +638,23 @@ def insert_leaderboard(score, leaderboard):
     :return: True if the score was added to the leaderboard, False otherwise
     """
     # If the score is lower than the last score on the leaderboard and there are already 10 scores, return false
+    ret = False
     if score[1] < leaderboard[-1][1] and len(leaderboard) == 10:
-        return False
+        return ret
     else:
         # Starting from the back of the list, insert the score at the proper position
-        for i in range(len(leaderboard), 1):
-            if score[1] < leaderboard[i - 1][1]:
+        for i in range(len(leaderboard), 0, -1):
+            if score[1] <= leaderboard[i - 1][1]:
                 leaderboard.insert(i, score)
+                ret = True
                 break
+        # If ret is not True, this is the highest score of all time
+        if not ret:
+            leaderboard.insert(0, score)
         # Keep the length of the list down to 10
         if len(leaderboard) > 10:
-            leaderboard = leaderboard[:10]
+            leaderboard.remove(leaderboard[-1])
         return True
-
-
-
-
 
 if __name__ == '__main__':
     pygame.init()
@@ -734,6 +749,7 @@ if __name__ == '__main__':
 
         pygame.display.update()
         clock.tick(60)
-    pygame.quit()
+    pygame.quit() 
+
 
 
