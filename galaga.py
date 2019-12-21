@@ -4,9 +4,7 @@ Taylor Barmak
 This program allows the user to play Galaga using the arrow keys and space bar.
 
 Recent updates:
-- Fix leaderboard insert method
-- Fix read_leaderboard method
-- Write write_leaderboard method
+- Player can now enter their initials if they achieve a high score
 
 Next fixes:
 - Enemy ships of different values and colors
@@ -31,6 +29,8 @@ resetting_ships = []    # List of enemy ships that are putting themselves back i
 moves = 75  # Variable to keep track of if it's time for the ships to change direction
 score = 0   # Variable to keep track of the player's score
 level = 1  # Variable to keep track of what level the player is on
+initials = ""  # Variable stores the initials of the player if they achieve a top 10 score
+
 
 class PlayerShip:
     """
@@ -184,6 +184,15 @@ class PlayerShip:
         :return: None
         """
         self.explosion = 50
+        self.speed = 0
+
+    def get_explosion(self):
+        """
+        Method returns the explosion count of the player to see if they are currently exploding
+        :return: int explosion count of the ship
+        """
+        return self.explosion
+
 
 class enemyShip:
     """
@@ -227,7 +236,7 @@ class enemyShip:
         Method reverses the horizontal speed of the enemy ship
         :return: None
         """
-        if SWAY_DIRECTION == True:
+        if SWAY_DIRECTION:
             self.xspeed = FLEET_SWAY_SPEED
         else:
             self.xspeed = -FLEET_SWAY_SPEED
@@ -270,6 +279,7 @@ class enemyShip:
         :return: an int representing the width of the ship
         """
         return self.width
+
     def get_value(self):
         """
         Method returns the value of the ship
@@ -323,6 +333,7 @@ class enemyShip:
             self.yspeed = 0
             resetting_ships.remove(self)
 
+
 def set_dimensions():
     """
     Sets the global HEIGHT and WIDTH constants which are the height and width of the window of the game.
@@ -340,6 +351,7 @@ def set_dimensions():
     HEIGHT = int(infoObject.current_h * HEIGHT_MULTIPLIER)
     WIDTH = int(HEIGHT * H_TO_W_MULTIPLIER)
 
+
 def draw_heart(surface, color, pos, width):
     """
     Method draws a heart with the provided color, position, and width
@@ -355,6 +367,7 @@ def draw_heart(surface, color, pos, width):
     pygame.draw.polygon(surface, color, [(pos[0], pos[1] + width/4), (pos[0] + width/2, pos[1] + width),
                                          (pos[0] + width, pos[1] + width/4)])
 
+
 def generate_stars(number):
     """
     Creates locations and radii randomly for stars
@@ -368,6 +381,7 @@ def generate_stars(number):
     for i in range(number):
         star_locations.append((random.randint(0, WIDTH), random.randint(0, HEIGHT), random.randint(1, 2)))
 
+
 def draw_stars(surface):
     """
     Draw the stars on the screen according to the global star_locations varaible
@@ -376,6 +390,7 @@ def draw_stars(surface):
     """
     for star in star_locations:
         pygame.draw.circle(surface, (255, 255, 255), star[:2], star[2])
+
 
 def generate_enemies(rows):
     """
@@ -389,6 +404,7 @@ def generate_enemies(rows):
             ship = enemyShip(((1 + i) * WIDTH/(1 + rows[row_index]), 30*(1 + row_index)), 10)
             enemy_ships.append(ship)
 
+
 def draw_enemies(surface):
     """
     Method draws the enemy ships in the global enemy ships list onto the surface provided
@@ -397,6 +413,7 @@ def draw_enemies(surface):
     """
     for ship in enemy_ships:
         ship.draw_ship(surface)
+
 
 def move_enemies(player):
     """
@@ -432,6 +449,7 @@ def move_enemies(player):
         SWAY_DIRECTION = not SWAY_DIRECTION
         moves = 0
 
+
 def check_missile_collisions(player):
     """
     Method checks if a missile has collided with an enemy and removes the missile and enemy if there is a collision
@@ -449,6 +467,7 @@ def check_missile_collisions(player):
                 score += enemy.get_value()
                 enemy_ships.remove(enemy)
                 player.explode_missile(missile)
+
 
 def check_ship_collisions(player):
     """
@@ -483,6 +502,7 @@ def check_ship_collisions(player):
             dropping_ships = []
             resetting_ships = []
 
+
 def display_score(surface):
     """
     Method displays the score in the bottom right corner of the screen
@@ -494,6 +514,7 @@ def display_score(surface):
     textRect = text.get_rect()
     textRect.center = (WIDTH * 0.9, HEIGHT * 0.95)
     surface.blit(text, textRect)
+
 
 def display_start(surface):
     """
@@ -532,6 +553,7 @@ def display_start(surface):
     surface.blit(howTo2, textRectHowTo2)
     surface.blit(instructions, textRectInstructions)
 
+
 def display_lost(surface):
     """
     Method displays the screen that appears when the player loses
@@ -556,6 +578,7 @@ def display_lost(surface):
     surface.blit(scoreMsg, textRectScoreMsg)
     surface.blit(finalScore, textRectScore)
 
+
 def display_continue(surface):
     """
     Method displays the screen that appears in between levels
@@ -570,6 +593,28 @@ def display_continue(surface):
     textRectMessage.center = (WIDTH * 0.5, HEIGHT * 0.5)
     surface.blit(message, textRectMessage)
 
+
+def display_enter_initials(surface):
+    """
+    Method will display a screen that allows the user to enter their initials
+    :param surface: the surface to draw the initials on
+    :return: None
+    """
+    surface.fill((0, 0, 100))
+    draw_stars(surface)
+    font1 = pygame.font.Font('freesansbold.ttf', 30)
+    font2 = pygame.font.Font("freesansbold.ttf", 80)
+    for i in range(len(initials)):
+        letter = font2.render(initials[i], True, (255, 255, 255))
+        textRectLetter = letter.get_rect()
+        textRectLetter.center = (WIDTH * ((i + 2)/ 6), HEIGHT * 0.5)
+        surface.blit(letter, textRectLetter)
+    msg = font1.render("Enter your initials", True, (255, 255, 255))
+    textRectMsg = msg.get_rect()
+    textRectMsg.center = (WIDTH * 0.5, HEIGHT * 0.3)
+    surface.blit(msg, textRectMsg)
+
+
 def drop_enemies(prob):
     """
     Method causes enemies to drop out of the sky at a speed relative to the argument provided
@@ -582,6 +627,7 @@ def drop_enemies(prob):
             ship = random.choice(enemy_ships)
             dropping_ships.append(ship)
             ship.drop()
+
 
 def start_level():
     """
@@ -601,6 +647,7 @@ def start_level():
             nums.append(num)
         generate_enemies(nums)
 
+
 def read_leaderboard(filename):
     """
     Method reads in the leaderboard from the filename and returns a list of tuples containing the initials and score of
@@ -616,6 +663,7 @@ def read_leaderboard(filename):
             line = f_read.readline().strip().split()
     return ret
 
+
 def write_leaderboard(filename, leaderboard):
     """
     Method writes a leaderboard to the file provided as the argument
@@ -628,6 +676,7 @@ def write_leaderboard(filename, leaderboard):
         print(leader[0], leader[1], file=f)
     f.close()
 
+
 def insert_leaderboard(score, leaderboard):
     """
     Method attempts to enter a score into the leaderboard. Leaderboard will only store top 10 scores. It will return
@@ -639,6 +688,9 @@ def insert_leaderboard(score, leaderboard):
     """
     # If the score is lower than the last score on the leaderboard and there are already 10 scores, return false
     ret = False
+    if len(leaderboard) == 0:
+        leaderboard.append(score)
+        return True
     if score[1] < leaderboard[-1][1] and len(leaderboard) == 10:
         return ret
     else:
@@ -676,6 +728,7 @@ if __name__ == '__main__':
 
     atStart = True  # variable to determine if start screen should be shown
     lost = False    # Variable for if player lost the game
+    onLeaderboard = False   # Variable for if the player is on the leaderboard
     completedLevel = False  # Variable for if player is in between levels
     playing = True  # Variable for if the game should continue
     while playing:
@@ -687,27 +740,89 @@ if __name__ == '__main__':
                 player.set_speed(0)
             # If a key is pressed, respond accordingly
             if event.type == pygame.KEYDOWN:
-                # Move left if the left key is pressed
-                if event.key == pygame.K_LEFT:
-                    player.set_speed(-5)
-                # Move right if the right key is pressed
-                if event.key == pygame.K_RIGHT:
-                    player.set_speed(5)
-                # Shoot missiles if the space bar is pressed
+                if onLeaderboard:
+                    if event.key == pygame.K_a:
+                        initials = initials + "A"
+                    elif event.key == pygame.K_b:
+                        initials = initials + "B"
+                    elif event.key == pygame.K_c:
+                        initials = initials + "C"
+                    elif event.key == pygame.K_d:
+                        initials = initials + "D"
+                    elif event.key == pygame.K_e:
+                        initials = initials + "E"
+                    elif event.key == pygame.K_f:
+                        initials = initials + "F"
+                    elif event.key == pygame.K_g:
+                        initials = initials + "G"
+                    elif event.key == pygame.K_h:
+                        initials = initials + "H"
+                    elif event.key == pygame.K_i:
+                        initials = initials + "I"
+                    elif event.key == pygame.K_j:
+                        initials = initials + "J"
+                    elif event.key == pygame.K_k:
+                        initials = initials + "K"
+                    elif event.key == pygame.K_l:
+                        initials = initials + "L"
+                    elif event.key == pygame.K_m:
+                        initials = initials + "M"
+                    elif event.key == pygame.K_n:
+                        initials = initials + "N"
+                    elif event.key == pygame.K_o:
+                        initials = initials + "O"
+                    elif event.key == pygame.K_p:
+                        initials = initials + "P"
+                    elif event.key == pygame.K_q:
+                        initials = initials + "Q"
+                    elif event.key == pygame.K_r:
+                        initials = initials + "R"
+                    elif event.key == pygame.K_s:
+                        initials = initials + "S"
+                    elif event.key == pygame.K_t:
+                        initials = initials + "T"
+                    elif event.key == pygame.K_u:
+                        initials = initials + "U"
+                    elif event.key == pygame.K_v:
+                        initials = initials + "V"
+                    elif event.key == pygame.K_w:
+                        initials = initials + "W"
+                    elif event.key == pygame.K_x:
+                        initials = initials + "X"
+                    elif event.key == pygame.K_y:
+                        initials = initials + "Y"
+                    elif event.key == pygame.K_z:
+                        initials = initials + "Z"
+                    elif event.key == pygame.K_BACKSPACE:
+                        initials = initials[:-1]
+                if player.get_explosion() == 0:
+                    # Move left if the left key is pressed
+                    if event.key == pygame.K_LEFT:
+                        player.set_speed(-5)
+                    # Move right if the right key is pressed
+                    if event.key == pygame.K_RIGHT:
+                        player.set_speed(5)
                 if event.key == pygame.K_SPACE:
                     if atStart:
                         atStart = not atStart
-                    if completedLevel:
+                    elif completedLevel:
                         level += 1
                         completedLevel = False
                         start_level()
-                    else:
+                    elif player.get_explosion() == 0:
                         player.shoot()
-
         if atStart:
             display_start(screen)
         elif lost:
-            display_lost(screen)
+            if onLeaderboard:
+                if len(initials) == 3:
+                    leaderboard = read_leaderboard("leaderboard.txt")
+                    onLeaderboard = insert_leaderboard((initials, score), leaderboard)
+                    write_leaderboard("leaderboard.txt", leaderboard)
+                    onLeaderboard = False
+                display_enter_initials(screen)
+            else:
+                display_lost(screen)
         elif completedLevel:
             display_continue(screen)
         else:
@@ -730,6 +845,8 @@ if __name__ == '__main__':
             check_missile_collisions(player)
             check_ship_collisions(player)
             if player.get_lives() < 0:
+                leaderboard = read_leaderboard("leaderboard.txt")
+                onLeaderboard = insert_leaderboard((initials, score), leaderboard)
                 lost = True
 
             # Cover everything up with the background and draw the stars
