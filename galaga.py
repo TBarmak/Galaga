@@ -303,6 +303,9 @@ class enemyShip:
         pPos = player.get_position()[1]
         ePos = self.position
         slope = (pPos[1] - ePos[1]) / (pPos[0] - ePos[0])
+        # Prevent divide by 0
+        if slope == 0:
+            slope = 0.01
         x_speed = 2 / slope
         if x_speed > 2:
             x_speed = 2
